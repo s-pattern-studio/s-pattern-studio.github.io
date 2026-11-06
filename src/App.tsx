@@ -11,13 +11,16 @@ import WorkPanel from './components/WorkPanel';
 import Markdown from './components/Markdown';
 import {collection} from './lib/content';
 import {surfaces,surfaceTransform,type SurfaceRect,type SurfaceRefs} from './lib/surfaces';
+import {useStaticExperience} from './lib/device';
+import StudioEntrance from './components/StudioEntrance';
 
 const Scene = lazy(() => import('./Scene'));
 const art = `${import.meta.env.BASE_URL}concept.jpg`;
 function Arrow({diagonal = false}: {diagonal?:boolean}) { return <span aria-hidden="true">{diagonal ? '↗' : '↗'}</span>; }
-class SceneBoundary extends Component<{children:ReactNode;fallback:ReactNode}, {failed:boolean}> {
+class SceneBoundary extends Component<{children:ReactNode;fallback:ReactNode;onFailure:()=>void}, {failed:boolean}> {
   state={failed:false};
   static getDerivedStateFromError(){return {failed:true};}
+  componentDidCatch(){this.props.onFailure();}
   render(){return this.state.failed?this.props.fallback:this.props.children;}
 }
 
@@ -25,6 +28,13 @@ function useReducedMotion() {
   const [reduced,setReduced]=useState(()=>window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   useEffect(()=>{const media=window.matchMedia('(prefers-reduced-motion: reduce)');const update=()=>setReduced(media.matches);media.addEventListener('change',update);return()=>media.removeEventListener('change',update);},[]);
   return reduced;
+}
+
+function useMobileExperience(){
+ const read=()=>useStaticExperience(innerWidth,matchMedia('(pointer: coarse)').matches,navigator.userAgent);
+ const [mobile,setMobile]=useState(read);
+ useEffect(()=>{const media=matchMedia('(pointer: coarse)'),update=()=>setMobile(read());window.addEventListener('resize',update);media.addEventListener('change',update);return()=>{window.removeEventListener('resize',update);media.removeEventListener('change',update);};},[]);
+ return mobile;
 }
 
 function PanelContent({section,t,locale}: {section:Section;t:Messages;locale:Locale}) {
@@ -74,6 +84,9 @@ export default function App() {
   const [now,setNow]=useState(()=>new Date());
   const [still,setStill]=useState(()=>safeRead('sp-still')==='true');
   const [failed,setFailed]=useState(false);
+  const [entered,setEntered]=useState(false);
+  const [sceneReady,setSceneReady]=useState(false);
+  const mobile=useMobileExperience();
   const [view,setView]=useState<RoomView>('room');
   const [menu,setMenu]=useState(false);
   const [pending,setPending]=useState<Section|null>(null);
@@ -87,7 +100,7 @@ export default function App() {
   const markers=useRef<MarkerRefs['current']>({});
   const reduced=useReducedMotion();
   const t=messages[route.locale];
-  const flat=still||failed||reduced;
+  const flat=mobile||still||failed||reduced;
   const hour=periodHour(period,now);
   const allSections:Section[]=['work','records','books','memories','studio','contact'];
   useEffect(()=>{
@@ -100,6 +113,7 @@ export default function App() {
     return()=>document.removeEventListener('visibilitychange',update);
   },[]);
   useEffect(()=>{
+    if(!entered)return;
     if(route.section){
       setClosing(false);
       if(flat){setOrigin(undefined);setPanel(route.section);setPending(null);return;}
@@ -109,7 +123,7 @@ export default function App() {
       setPending(null);
       if(panel)setClosing(true);else setView('room');
     }
-  },[route.section,flat]);
+  },[route.section,flat,entered]);
   useEffect(()=>{
     const cancel=(event:KeyboardEvent)=>{if(event.key==='Escape'){setMenu(false);if(menu)document.getElementById('room-navigation')?.focus();if(pending){navigate(null);}}};
     window.addEventListener('keydown',cancel);return()=>window.removeEventListener('keydown',cancel);
@@ -138,12 +152,12 @@ export default function App() {
   function collapsed(){setPanel(null);setClosing(false);setView('room');}
   function changePeriod(value:Period){setPeriod(value);safeWrite('sp-light',value);}
   const fallback=<div className="immersive-fallback"><img src={art} alt={t.snapshot}/><p>{t.sceneFallback}</p></div>;
-  return <div className="safehouse-app" data-presenting={Boolean(route.section||pending||panel)}>
-    <a className="skip-link" href="#room-navigation" onClick={e=>{e.preventDefault();document.getElementById('room-navigation')?.focus();}}>{t.skip}</a>
-    <main className="safehouse" aria-label={t.roomLabel} inert={Boolean(route.section||pending||panel)}>
+  return <div className="safehouse-app" data-flat={flat} data-entering={!entered} data-presenting={Boolean(route.section||pending||panel)}>
+    <a className="skip-link" inert={!entered} href="#room-navigation" onClick={e=>{e.preventDefault();document.getElementById('room-navigation')?.focus();}}>{t.skip}</a>
+    <main className="safehouse" aria-label={t.roomLabel} inert={!entered||Boolean(route.section||pending||panel)}>
       <h1 className="sr-only">S. Pattern Studio — {t.eyebrow}</h1>
       <div className="world-canvas">
-        {flat?fallback:<SceneBoundary fallback={fallback}><Suspense fallback={<div className="scene-loading"><span className="loading-disc"/>{t.sceneLoading}</div>}><Scene hour={hour} onSelect={openObject} active={pageVisible&&!panel} onFailure={()=>setFailed(true)} view={view} markers={markers} surfaceRects={surfaceRects} onArrive={arrived}/></Suspense></SceneBoundary>}
+        {flat?fallback:<SceneBoundary fallback={fallback} onFailure={()=>setFailed(true)}><Suspense fallback={<div className="scene-loading"><span className="loading-disc"/>{t.sceneLoading}</div>}><Scene hour={hour} onSelect={openObject} active={pageVisible&&!panel} onFailure={()=>setFailed(true)} onReady={()=>setSceneReady(true)} view={view} markers={markers} surfaceRects={surfaceRects} onArrive={arrived}/></Suspense></SceneBoundary>}
       </div>
       <div className="room-vignette" aria-hidden="true"/>
       {!flat&&<div className={`spatial-hotspots ${pending?'travelling':''}`} aria-label={t.explore}>
@@ -158,14 +172,15 @@ export default function App() {
         </div>
       </header>
       {<nav className={`room-menu ${menu?'is-open':''}`} inert={!menu} aria-hidden={!menu} id="room-menu" aria-label={t.roomDirectory}>{allSections.map((section,i)=><button key={section} onClick={()=>openObject(section)}><small>0{i+1}</small>{t.nav[section]}<Arrow/></button>)}</nav>}
-      <div className="room-intro" aria-live="polite"><span className="eyebrow">S. PATTERN / {view==='room'?'01':String(allSections.indexOf(view)+1).padStart(2,'0')}</span><h2>{pending?t.nav[pending]:view==='room'?t.roomWelcome:t.nav[view]}</h2><p>{pending?t.roomOpening:t.roomInstruction}</p></div>
+      <div className="room-intro" aria-live="polite"><span className="eyebrow">S. PATTERN / {view==='room'?'01':String(allSections.indexOf(view)+1).padStart(2,'0')}</span><h2>{pending?t.nav[pending]:view==='room'?t.roomWelcome:t.nav[view]}</h2><p>{pending?t.roomOpening:flat?t.stillInstruction:t.roomInstruction}</p></div>
       <div className="room-bottom">
         <div className="room-time"><div><span className="light-dot"/><span className="local-clock">{now.toLocaleTimeString(route.locale,{hour:'2-digit',minute:'2-digit',hour12:false})}</span><span className="room-time-label">LOCAL TIME</span></div><StudioSelect label={t.lighting} value={period} onChange={value=>changePeriod(value as Period)} disabled={flat} placement="up" options={periods.map(p=>({value:p,label:t.period[p]}))}/></div>
-        <div className="room-utility"><button onClick={()=>openObject('contact')}>{t.nav.contact}<Arrow/></button>{!reduced&&!failed&&<button className="quiet-toggle" aria-pressed={still} onClick={()=>setStill(!still)}>{still?t.live:t.simple}</button>}</div>
+        <div className="room-utility"><button onClick={()=>openObject('contact')}>{t.nav.contact}<Arrow/></button>{!mobile&&!reduced&&!failed&&<button className="quiet-toggle" aria-pressed={still} onClick={()=>setStill(!still)}>{still?t.live:t.simple}</button>}</div>
       </div>
-      {flat&&<nav className="flat-entries" aria-label={t.explore}>{allSections.map(s=><button key={s} onClick={()=>openObject(s)}>{t.nav[s]} ↗</button>)}</nav>}
+      {flat&&<nav className="flat-entries" aria-label={t.explore}>{allSections.map((s,i)=><button key={s} onClick={()=>openObject(s)}><small>0{i+1}</small><span>{t.nav[s]}</span><b aria-hidden="true">↗</b></button>)}</nav>}
     </main>
     {panel&&<ContentDialog key={panel} section={panel} t={t} locale={route.locale} onClose={closePanel} closing={closing} onCollapsed={collapsed} reduced={reduced} origin={origin}/> }
+    {!entered&&<StudioEntrance ready={flat||sceneReady} reduced={reduced} locale={route.locale} onComplete={()=>setEntered(true)} onStatic={()=>{setStill(true);setEntered(true);}}/>}
   </div>;
 }
 

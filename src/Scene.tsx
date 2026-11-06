@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame, useThree, useLoader, type ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import { lightingAt, type Section } from './lib/model';
@@ -6,6 +6,7 @@ import { hotspots, views, inspectionViews, type RoomView, type MarkerRefs } from
 
 import {cameraJourney,advanceJourney} from './lib/cameraJourney';
 import {surfaces,type SurfaceRefs} from './lib/surfaces';
+import {posterLayout} from './lib/posters';
 
 type V3 = [number, number, number];
 const surfaceCache = new Map<string,THREE.CanvasTexture>();
@@ -63,9 +64,9 @@ function posterTexture(index: number) {
 }
 
 function Posters() {
-  const textures = useMemo(() => Array.from({length: 8}, (_, i) => posterTexture(i)), []);
+  const textures = useMemo(() => posterLayout.map((_, i) => posterTexture(i)), []);
   useEffect(() => () => textures.forEach(t => t.dispose()), [textures]);
-  return <group>{textures.map((map, i) => <mesh key={i} position={[-3.28 + (i % 4) * 0.76, 2.82 - Math.floor(i / 4) * 1.04, -2.87]} rotation={[0, 0, (i % 3 - 1) * 0.014]}>
+  return <group>{textures.map((map, i) => <mesh key={i} position={posterLayout[i].position} rotation={[0, 0, posterLayout[i].rotation]}>
     <planeGeometry args={[0.72, 0.99]}/><meshStandardMaterial map={map} roughness={1}/>
   </mesh>)}</group>;
 }
@@ -237,7 +238,7 @@ function Room({hour,onSelect,active,view,markers,surfaceRects,onArrive}: {hour:n
       <Hit p={[2.6,2.5,-2.7]} s={[2.3,1.5,0.2]} section="memories" onSelect={onSelect}/>
       <Hit p={[2.4,1.5,1]} s={[2.5,1.3,1.25]} section="work" onSelect={onSelect}/>
       <Hit p={[1.45,1.28,1.48]} s={[0.38,0.15,0.3]} section="contact" onSelect={onSelect}/>
-      <Hit p={[-2.15,2.4,-2.7]} s={[3.1,2.1,0.2]} section="studio" onSelect={onSelect}/>
+      <Hit p={[-2.54,2.3,-2.7]} s={[2.44,2.1,0.2]} section="studio" onSelect={onSelect}/>
     </group>
   </>;
 }
@@ -254,9 +255,16 @@ function ContextEvents({onFailure}:{onFailure:()=>void}) {
 
 const initialCamera={position:views.room.position,fov:66,near:0.08,far:60};
 
-export default function Scene({hour,onSelect,active,onFailure,view,markers,surfaceRects,onArrive}: {hour:number;onSelect:(s:Section)=>void;active:boolean;onFailure:()=>void;view:RoomView;markers:MarkerRefs;surfaceRects:SurfaceRefs;onArrive:(view:RoomView)=>void}) {
+function FirstPaint({onReady}:{onReady:()=>void}){
+  const frames=useRef(0),{invalidate}=useThree();
+  useFrame(()=>{if(frames.current>=2)return;frames.current++;if(frames.current===2)onReady();else invalidate();});
+  return null;
+}
+
+export default function Scene({hour,onSelect,active,onFailure,view,markers,surfaceRects,onArrive,onReady}: {hour:number;onSelect:(s:Section)=>void;active:boolean;onFailure:()=>void;view:RoomView;markers:MarkerRefs;surfaceRects:SurfaceRefs;onArrive:(view:RoomView)=>void;onReady:()=>void}) {
   return <Canvas shadows camera={initialCamera} dpr={[1,1.5]} frameloop={active?'demand':'never'} gl={{antialias:true,alpha:true,powerPreference:'low-power'}} onCreated={({gl})=>{
     gl.toneMapping=THREE.ACESFilmicToneMapping;
     gl.shadowMap.autoUpdate=false;gl.shadowMap.needsUpdate=true;
-  }}><ContextEvents onFailure={onFailure}/><Room hour={hour} onSelect={onSelect} active={active} view={view} markers={markers} surfaceRects={surfaceRects} onArrive={onArrive}/></Canvas>;
+  }}><Suspense fallback={null}><ContextEvents onFailure={onFailure}/><Room hour={hour} onSelect={onSelect} active={active} view={view} markers={markers} surfaceRects={surfaceRects} onArrive={onArrive}/><FirstPaint onReady={onReady}/></Suspense></Canvas>;
 }
+

@@ -1,6 +1,6 @@
 import type { Messages } from './en';
 export const zhTW: Messages = {
-  roomOverview: '房間全景', roomSubtitle: '設計 · 程式 · 生活', roomDirectory: '空間導覽', roomNavigation: '探索工作室', roomWelcome: '歡迎，隨意坐。', roomInstruction: '點一件物件打開故事，關閉後回到房間全景。', roomOpening: '正在打開這段故事⋯',
+  roomOverview: '房間全景', roomSubtitle: '設計 · 程式 · 生活', roomDirectory: '空間導覽', roomNavigation: '探索工作室', roomWelcome: '歡迎，隨意坐。', stillInstruction: '選一個主題，探索工作室的作品與故事。', roomInstruction: '點一件物件打開故事，關閉後回到房間全景。', roomOpening: '正在打開這段故事⋯',
   nav: { work: '精選作品', studio: '關於工作室', records: '音樂與街舞', books: '閱讀書單', memories: '城市回憶', contact: '洽談合作' },
   eyebrow: '獨立數位創作工作室', hero1: '讓設計有節奏，', hero2: '讓想法有形狀。',
   intro: '設計、程式，還有一點靈魂。從街舞、閱讀與城市生活裡汲取養分，創作有個性的數位體驗。',

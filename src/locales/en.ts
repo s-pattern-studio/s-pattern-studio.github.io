@@ -1,5 +1,5 @@
 export const en = {
-  roomOverview: 'Room', roomSubtitle: 'DESIGN · CODE · CULTURE', roomDirectory: 'Directory', roomNavigation: 'Explore the studio', roomWelcome: 'Make yourself at home.', roomInstruction: 'Touch an object to open its story. Close it to return to the room.', roomOpening: 'Opening this chapter…',
+  roomOverview: 'Room', roomSubtitle: 'DESIGN · CODE · CULTURE', roomDirectory: 'Directory', roomNavigation: 'Explore the studio', roomWelcome: 'Make yourself at home.', stillInstruction: 'Choose a chapter to explore our work and stories.', roomInstruction: 'Touch an object to open its story. Close it to return to the room.', roomOpening: 'Opening this chapter…',
   nav: { work: 'Work', studio: 'Studio', records: 'Records', books: 'Reading', memories: 'Places', contact: 'Let’s talk' },
   eyebrow: 'INDEPENDENT DIGITAL STUDIO', hero1: 'Made with rhythm.', hero2: 'Built with intention.',
   intro: 'Design, code, and a little soul. A digital studio shaped by street culture, curious minds, and the places in between.',
